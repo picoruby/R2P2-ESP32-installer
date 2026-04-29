@@ -1,0 +1,65 @@
+name: Update Firmware
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # Every 15 minutes
+  workflow_dispatch:           # Allow manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check latest release
+        id: release
+        run: |
+          TAG=$(curl -fSs \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/picoruby/R2P2-ESP32/releases/latest \
+            | jq -r '.tag_name')
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with current version
+        id: compare
+        run: |
+          CURRENT=$(cat .firmware-version 2>/dev/null || echo "")
+          LATEST="${{ steps.release.outputs.tag }}"
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "Already up to date: ${LATEST}"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+            echo "Update available: ${CURRENT} -> ${LATEST}"
+          fi
+
+      - name: Download firmware
+        if: steps.compare.outputs.up_to_date == 'false'
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          BASE="https://github.com/picoruby/R2P2-ESP32/releases/download/${TAG}"
+
+          dl() { curl -fSL -o "$2" "$1"; }
+
+          dl "${BASE}/R2P2-ESP32-esp32-femtoruby.bin"               firmware/esp32/femtoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32-picoruby.bin"                firmware/esp32/picoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32c3-femtoruby.bin"             firmware/esp32c3/femtoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32c3-picoruby.bin"              firmware/esp32c3/picoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32s3-femtoruby.bin"             firmware/esp32s3/femtoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32s3-picoruby.bin"              firmware/esp32s3/picoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32s3-usb_console-femtoruby.bin" firmware/esp32s3-usb_console/femtoruby.bin
+          dl "${BASE}/R2P2-ESP32-esp32s3-usb_console-picoruby.bin"  firmware/esp32s3-usb_console/picoruby.bin
+
+          echo "${TAG}" > .firmware-version
+
+      - name: Commit and push
+        if: steps.compare.outputs.up_to_date == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add firmware/ .firmware-version
+          git commit -m "Update firmware to ${{ steps.release.outputs.tag }}"
+          git push
