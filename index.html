@@ -364,30 +364,22 @@
         function generateManifest(asset, version) {
             const baseUrl = getBaseUrl();
             const chipFamily = CHIP_FAMILY_MAP[asset.chip];
-            const appBin = baseUrl + `firmware/${asset.chip}${asset.variant ? '-' + asset.variant : ''}-${asset.ruby}.bin`;
-            let parts;
-            let newInstallPromptErase = false;
+            const chipDir = asset.chip + (asset.variant ? '-' + asset.variant : '');
+            const appBin = baseUrl + `firmware/${chipDir}-${asset.ruby}.bin`;
 
-            if (asset.chip === 'esp32' && !asset.variant) {
-                // Full flash: local support files + app binary
-                parts = [
-                    { path: baseUrl + 'firmware/bootloader.bin',       offset: 4096 },
-                    { path: baseUrl + 'firmware/partition-table.bin',   offset: 32768 },
-                    { path: appBin,                                     offset: 65536 },
-                    { path: baseUrl + 'firmware/storage.bin',           offset: 2162688 },
-                ];
-                newInstallPromptErase = true;
-            } else {
-                // App binary only (other chip families lack local support files)
-                parts = [{ path: appBin, offset: 65536 }];
-            }
+            const parts = [
+                { path: baseUrl + `firmware/${chipDir}/bootloader.bin`,     offset: 4096 },
+                { path: baseUrl + `firmware/${chipDir}/partition-table.bin`, offset: 32768 },
+                { path: appBin,                                              offset: 65536 },
+                { path: baseUrl + 'firmware/storage.bin',                    offset: 2162688 },
+            ];
 
             const manifest = {
                 name: 'R2P2-ESP32',
                 version: version,
+                new_install_prompt_erase: true,
                 builds: [{ chipFamily, improv: false, parts }],
             };
-            if (newInstallPromptErase) manifest.new_install_prompt_erase = true;
             return manifest;
         }
 
