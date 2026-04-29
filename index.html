@@ -326,11 +326,11 @@
             esp32s3_usb_console: 'ESP32-S3',
         };
 
-        // RISC-V chips use bootloader offset 0x0000; Xtensa chips use 0x1000
+        // ESP32 (original) uses bootloader offset 0x1000; all other chips use 0x0000
         const BOOTLOADER_OFFSET_MAP = {
             esp32:   4096,
             esp32c3: 0,
-            esp32s3: 4096,
+            esp32s3: 0,
         };
 
         const CHIP_LABEL_MAP = {
