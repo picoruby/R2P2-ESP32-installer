@@ -320,9 +320,17 @@
         const GITHUB_RELEASES_API = 'https://api.github.com/repos/picoruby/R2P2-ESP32/releases/latest';
 
         const CHIP_FAMILY_MAP = {
-            esp32:   'ESP32',
-            esp32c3: 'ESP32-C3',
-            esp32s3: 'ESP32-S3',
+            esp32:              'ESP32',
+            esp32c3:            'ESP32-C3',
+            esp32s3:            'ESP32-S3',
+            esp32s3_usb_console: 'ESP32-S3',
+        };
+
+        // RISC-V chips use bootloader offset 0x0000; Xtensa chips use 0x1000
+        const BOOTLOADER_OFFSET_MAP = {
+            esp32:   4096,
+            esp32c3: 0,
+            esp32s3: 4096,
         };
 
         const CHIP_LABEL_MAP = {
@@ -367,8 +375,9 @@
             const chipDir = asset.chip + (asset.variant ? '-' + asset.variant : '');
             const appBin = baseUrl + `firmware/${chipDir}-${asset.ruby}.bin`;
 
+            const bootloaderOffset = BOOTLOADER_OFFSET_MAP[asset.chip] ?? 4096;
             const parts = [
-                { path: baseUrl + `firmware/${chipDir}/bootloader.bin`,     offset: 4096 },
+                { path: baseUrl + `firmware/${chipDir}/bootloader.bin`,     offset: bootloaderOffset },
                 { path: baseUrl + `firmware/${chipDir}/partition-table.bin`, offset: 32768 },
                 { path: appBin,                                              offset: 65536 },
                 { path: baseUrl + 'firmware/storage.bin',                    offset: 2162688 },
