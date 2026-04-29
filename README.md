@@ -2,66 +2,83 @@
 
 Web-based firmware installer for R2P2-ESP32 (PicoRuby on ESP32).
 
-https://kishima.github.io/R2P2-ESP32-installer/
+https://picoruby.org/R2P2-ESP32-installer/
 
 ## Usage
 
 1. Connect your ESP32 device via USB
 2. Open the installer page in Chrome, Edge, or Opera
-3. Click **Connect and Flash** and select the serial port
-4. Wait for flashing to complete
-5. Click **Connect to Serial** to open the serial console
+3. Select your board and Ruby variant from the dropdowns
+4. Click **Connect and Flash** and select the serial port
+5. Wait for flashing to complete
+6. Click **Connect to Serial** to open the serial console
 
 ## Requirements
 
 - Browser with Web Serial API support (Chrome, Edge, Opera)
 - USB-connected ESP32 device
 
+## Supported boards
+
+| Board | chipFamily |
+|-------|------------|
+| ESP32 | ESP32 |
+| ESP32-C3 | ESP32-C3 |
+| ESP32-S3 | ESP32-S3 |
+| ESP32-S3 (USB Console) | ESP32-S3 |
+
+## Firmware variants
+
+| Variant | Description |
+|---------|-------------|
+| FemtoRuby | Lightweight Ruby runtime |
+| PicoRuby | Full PicoRuby runtime |
+
 ## Updating firmware
 
-### Getting bin files
+### Directory structure
 
-Build R2P2-ESP32 and copy the following files into `firmware/`:
+Firmware files are organized by chip in the `firmware/` directory:
 
 ```
-build/bootloader/bootloader.bin     -> firmware/bootloader.bin
-build/partition_table/partition-table.bin -> firmware/partition-table.bin
-build/R2P2-ESP32.bin                -> firmware/R2P2-ESP32.bin
-build/storage.bin                   -> firmware/storage.bin
+firmware/
+  storage.bin                          # shared across all chips
+  esp32/
+    bootloader.bin
+    partition-table.bin
+    femtoruby.bin
+    picoruby.bin
+  esp32c3/
+    bootloader.bin
+    partition-table.bin
+    femtoruby.bin
+    picoruby.bin
+  esp32s3/
+    bootloader.bin
+    partition-table.bin
+    femtoruby.bin
+    picoruby.bin
+  esp32s3-usb_console/
+    bootloader.bin
+    partition-table.bin
+    femtoruby.bin
+    picoruby.bin
 ```
 
-### manifest.json
+### Flash offsets
 
-`manifest.json` defines which bin files to flash and at what offsets.
-
-```json
-{
-  "name": "R2P2-ESP32",
-  "version": "1.0.0",
-  "builds": [
-    {
-      "chipFamily": "ESP32",
-      "parts": [
-        { "path": "firmware/bootloader.bin",       "offset": 4096 },
-        { "path": "firmware/partition-table.bin",   "offset": 32768 },
-        { "path": "firmware/R2P2-ESP32.bin",        "offset": 65536 },
-        { "path": "firmware/storage.bin",           "offset": 2162688 }
-      ]
-    }
-  ]
-}
-```
-
-Offset values are derived from:
-
-| Part | Offset | Source |
-|------|--------|--------|
-| bootloader.bin | 0x1000 (4096) | ESP-IDF default |
-| partition-table.bin | 0x8000 (32768) | ESP-IDF default |
-| R2P2-ESP32.bin | 0x10000 (65536) | `partitions.csv` factory offset |
-| storage.bin | 0x210000 (2162688) | factory offset + factory size (0x10000 + 2M) |
+| Part | ESP32 offset | ESP32-C3/S3 offset | Source |
+|------|--------------|--------------------|--------|
+| bootloader.bin | 0x1000 (4096) | 0x0000 (0) | ESP-IDF chip default |
+| partition-table.bin | 0x8000 (32768) | 0x8000 (32768) | ESP-IDF default |
+| femtoruby.bin / picoruby.bin | 0x10000 (65536) | 0x10000 (65536) | `partitions.csv` factory offset |
+| storage.bin | 0x210000 (2162688) | 0x210000 (2162688) | factory offset + factory size (0x10000 + 2M) |
 
 If `partitions.csv` changes, update the offsets accordingly.
+
+### Manifest generation
+
+The installer dynamically generates the manifest at runtime based on the selected board and Ruby variant. No static `manifest.json` is used. Firmware metadata is fetched from the [latest GitHub Release](https://github.com/picoruby/R2P2-ESP32/releases/latest) of the R2P2-ESP32 repository.
 
 ## Third-party components
 
