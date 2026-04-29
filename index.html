@@ -373,7 +373,7 @@
             const baseUrl = getBaseUrl();
             const chipFamily = CHIP_FAMILY_MAP[asset.chip];
             const chipDir = asset.chip + (asset.variant ? '-' + asset.variant : '');
-            const appBin = baseUrl + `firmware/${chipDir}-${asset.ruby}.bin`;
+            const appBin = baseUrl + `firmware/${chipDir}/${asset.ruby}.bin`;
 
             const bootloaderOffset = BOOTLOADER_OFFSET_MAP[asset.chip] ?? 4096;
             const parts = [
