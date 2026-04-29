@@ -364,7 +364,7 @@
         function generateManifest(asset, version) {
             const baseUrl = getBaseUrl();
             const chipFamily = CHIP_FAMILY_MAP[asset.chip];
-            const appBin = baseUrl + `firmware/${asset.chipKey}-${asset.ruby}.bin`;
+            const appBin = baseUrl + `firmware/${asset.chip}${asset.variant ? '-' + asset.variant : ''}-${asset.ruby}.bin`;
             let parts;
             let newInstallPromptErase = false;
 
