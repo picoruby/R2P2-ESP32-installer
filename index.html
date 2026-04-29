@@ -67,6 +67,72 @@
             line-height: 1.6;
         }
 
+        .firmware-select-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .firmware-select-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .release-status {
+            font-size: 13px;
+            margin-bottom: 15px;
+            min-height: 20px;
+        }
+
+        .release-status.loading {
+            color: #666;
+        }
+
+        .release-status.loaded {
+            color: #155724;
+        }
+
+        .release-status.error {
+            color: #721c24;
+        }
+
+        .select-area {
+            display: none;
+        }
+
+        .select-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+
+        .select-row label {
+            min-width: 140px;
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .select-row select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            max-width: 400px;
+        }
+
+        .select-row select:focus {
+            outline: none;
+            border-color: #CC342D;
+        }
+
         .flash-section {
             margin-bottom: 30px;
         }
@@ -200,9 +266,24 @@
             </ul>
         </div>
 
+        <div class="firmware-select-section">
+            <h2>Select Firmware</h2>
+            <div id="releaseStatus" class="release-status loading">Loading latest release info...</div>
+            <div id="selectArea" class="select-area">
+                <div class="select-row">
+                    <label for="chipSelect">Board:</label>
+                    <select id="chipSelect"></select>
+                </div>
+                <div class="select-row">
+                    <label for="rubySelect">Ruby Variant:</label>
+                    <select id="rubySelect"></select>
+                </div>
+            </div>
+        </div>
+
         <div class="flash-section">
             <h2>Flash Firmware</h2>
-            <esp-web-install-button manifest="./manifest.json">
+            <esp-web-install-button id="installButton">
                 <button slot="activate">Connect and Flash</button>
             </esp-web-install-button>
         </div>
@@ -234,6 +315,140 @@
     </div>
 
     <script>
+        // ---- Firmware selection ----
+
+        const GITHUB_RELEASES_API = 'https://api.github.com/repos/picoruby/R2P2-ESP32/releases/latest';
+
+        const CHIP_FAMILY_MAP = {
+            esp32:   'ESP32',
+            esp32c3: 'ESP32-C3',
+            esp32s3: 'ESP32-S3',
+        };
+
+        const CHIP_LABEL_MAP = {
+            esp32:              'ESP32',
+            esp32c3:            'ESP32-C3',
+            esp32s3:            'ESP32-S3',
+            esp32s3_usb_console: 'ESP32-S3 (USB Console)',
+        };
+
+        const RUBY_LABEL_MAP = {
+            femtoruby: 'FemtoRuby',
+            picoruby:  'PicoRuby',
+        };
+
+        let releaseInfo = null;
+        let parsedAssets = [];
+        let currentManifestUrl = null;
+
+        function parseAssets(assets) {
+            return assets
+                .filter(a => a.name.endsWith('.bin'))
+                .map(a => {
+                    // Pattern: R2P2-ESP32-{chip}-{variant?}-{ruby}.bin
+                    const base = a.name.replace(/^R2P2-ESP32-/, '').replace(/\.bin$/, '');
+                    const parts = base.split('-');
+                    const ruby = parts[parts.length - 1];
+                    const chip = parts[0];
+                    const variantParts = parts.slice(1, -1);
+                    const variant = variantParts.length > 0 ? variantParts.join('_') : null;
+                    const chipKey = variant ? `${chip}_${variant}` : chip;
+                    return { chip, variant, chipKey, ruby, url: a.browser_download_url };
+                });
+        }
+
+        function getBaseUrl() {
+            return window.location.href.replace(/[^/]*$/, '');
+        }
+
+        function generateManifest(asset, version) {
+            const baseUrl = getBaseUrl();
+            const chipFamily = CHIP_FAMILY_MAP[asset.chip];
+            let parts;
+            let newInstallPromptErase = false;
+
+            if (asset.chip === 'esp32' && !asset.variant) {
+                // Full flash: local support files + remote app binary
+                parts = [
+                    { path: baseUrl + 'firmware/bootloader.bin',       offset: 4096 },
+                    { path: baseUrl + 'firmware/partition-table.bin',   offset: 32768 },
+                    { path: asset.url,                                  offset: 65536 },
+                    { path: baseUrl + 'firmware/storage.bin',           offset: 2162688 },
+                ];
+                newInstallPromptErase = true;
+            } else {
+                // App binary only (other chip families lack local support files)
+                parts = [{ path: asset.url, offset: 65536 }];
+            }
+
+            const manifest = {
+                name: 'R2P2-ESP32',
+                version: version,
+                builds: [{ chipFamily, improv: false, parts }],
+            };
+            if (newInstallPromptErase) manifest.new_install_prompt_erase = true;
+            return manifest;
+        }
+
+        function updateManifest() {
+            if (!releaseInfo || parsedAssets.length === 0) return;
+
+            const chipKey = document.getElementById('chipSelect').value;
+            const ruby    = document.getElementById('rubySelect').value;
+            const asset   = parsedAssets.find(a => a.chipKey === chipKey && a.ruby === ruby);
+            if (!asset) return;
+
+            const manifest = generateManifest(asset, releaseInfo.tag_name);
+            const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+
+            if (currentManifestUrl) URL.revokeObjectURL(currentManifestUrl);
+            currentManifestUrl = URL.createObjectURL(blob);
+
+            document.getElementById('installButton').setAttribute('manifest', currentManifestUrl);
+        }
+
+        async function fetchReleaseInfo() {
+            const statusEl  = document.getElementById('releaseStatus');
+            const selectArea = document.getElementById('selectArea');
+
+            try {
+                const res = await fetch(GITHUB_RELEASES_API);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                releaseInfo   = await res.json();
+                parsedAssets  = parseAssets(releaseInfo.assets);
+
+                // Build chip options (unique chipKeys)
+                const chipKeys = [...new Map(parsedAssets.map(a => [a.chipKey, a])).keys()];
+                const chipSelect = document.getElementById('chipSelect');
+                chipSelect.innerHTML = chipKeys.map(key =>
+                    `<option value="${key}">${CHIP_LABEL_MAP[key] || key}</option>`
+                ).join('');
+
+                // Build ruby options (unique rubies)
+                const rubies = [...new Set(parsedAssets.map(a => a.ruby))];
+                const rubySelect = document.getElementById('rubySelect');
+                rubySelect.innerHTML = rubies.map(r =>
+                    `<option value="${r}">${RUBY_LABEL_MAP[r] || r}</option>`
+                ).join('');
+
+                chipSelect.addEventListener('change', updateManifest);
+                rubySelect.addEventListener('change', updateManifest);
+
+                statusEl.textContent = `Latest release: ${releaseInfo.tag_name}`;
+                statusEl.className   = 'release-status loaded';
+                selectArea.style.display = 'block';
+                updateManifest();
+
+            } catch (err) {
+                statusEl.textContent = `Failed to load release info: ${err.message}`;
+                statusEl.className   = 'release-status error';
+            }
+        }
+
+        fetchReleaseInfo();
+
+        // ---- Serial console ----
+
         let port;
         let reader;
         let writer;
@@ -242,26 +457,24 @@
         let isConnected = false;
         let ansi_up;
 
-        const consoleDiv = document.getElementById('console');
-        const connectBtn = document.getElementById('connectBtn');
-        const disconnectBtn = document.getElementById('disconnectBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const commandInput = document.getElementById('commandInput');
-        const sendBtn = document.getElementById('sendBtn');
+        const consoleDiv      = document.getElementById('console');
+        const connectBtn      = document.getElementById('connectBtn');
+        const disconnectBtn   = document.getElementById('disconnectBtn');
+        const clearBtn        = document.getElementById('clearBtn');
+        const commandInput    = document.getElementById('commandInput');
+        const sendBtn         = document.getElementById('sendBtn');
         const connectionStatus = document.getElementById('connectionStatus');
 
-        // Initialize ansi_up
         if (typeof AnsiUp !== 'undefined') {
             ansi_up = new AnsiUp();
             ansi_up.use_classes = false;
         }
 
-        function log(message, type = 'info') {
+        function log(message) {
             const timestamp = new Date().toLocaleTimeString();
             const line = `[${timestamp}] ${message}\n`;
             if (ansi_up) {
-                const html = ansi_up.ansi_to_html(line);
-                consoleDiv.innerHTML += html;
+                consoleDiv.innerHTML += ansi_up.ansi_to_html(line);
             } else {
                 consoleDiv.textContent += line;
             }
@@ -271,11 +484,11 @@
         function updateConnectionStatus(connected) {
             isConnected = connected;
             connectionStatus.textContent = connected ? 'Connected' : 'Disconnected';
-            connectionStatus.className = 'status ' + (connected ? 'connected' : 'disconnected');
-            connectBtn.disabled = connected;
+            connectionStatus.className   = 'status ' + (connected ? 'connected' : 'disconnected');
+            connectBtn.disabled    = connected;
             disconnectBtn.disabled = !connected;
-            commandInput.disabled = !connected;
-            sendBtn.disabled = !connected;
+            commandInput.disabled  = !connected;
+            sendBtn.disabled       = !connected;
         }
 
         async function connectSerial() {
@@ -293,136 +506,90 @@
 
                 updateConnectionStatus(true);
                 log('Serial connection established');
-
-                // Read loop
                 readLoop();
 
-                // Reset ESP32 via RTS (like idf.py monitor)
                 await port.setSignals({ dataTerminalReady: false, requestToSend: true });
                 await new Promise(resolve => setTimeout(resolve, 200));
                 await port.setSignals({ dataTerminalReady: false, requestToSend: false });
                 await new Promise(resolve => setTimeout(resolve, 200));
             } catch (error) {
-                log(`Error connecting: ${error.message}`, 'error');
+                log(`Error connecting: ${error.message}`);
             }
         }
 
         async function readLoop() {
-            console.log('readLoop started');
             try {
                 while (true) {
                     const { value, done } = await reader.read();
-                    console.log('readLoop: done=', done, 'value=', JSON.stringify(value));
-                    if (done) {
-                        break;
-                    }
+                    if (done) break;
                     if (ansi_up) {
-                        const html = ansi_up.ansi_to_html(value);
-                        consoleDiv.innerHTML += html;
+                        consoleDiv.innerHTML += ansi_up.ansi_to_html(value);
                     } else {
                         consoleDiv.textContent += value;
                     }
                     consoleDiv.scrollTop = consoleDiv.scrollHeight;
                 }
             } catch (error) {
-                console.error('readLoop error:', error);
-                log(`Read error: ${error.message}`, 'error');
+                log(`Read error: ${error.message}`);
             }
-            console.log('readLoop ended');
         }
 
         async function disconnectSerial() {
             try {
-                // Cancel reader first - this will close the readable stream
                 if (reader) {
                     await reader.cancel();
                     reader = null;
                 }
-
-                // Close writer - it might already be closed by reader.cancel()
                 if (writer) {
-                    try {
-                        await writer.close();
-                    } catch (e) {
-                        // Writer might already be closed, ignore error
-                        console.log('Writer close error (may be already closed):', e.message);
-                    }
+                    try { await writer.close(); } catch (e) {}
                     writer = null;
                 }
-
-                // Wait for streams to close
                 if (readableStreamClosed || writableStreamClosed) {
                     try {
                         await Promise.all([
                             readableStreamClosed?.catch(() => {}),
-                            writableStreamClosed?.catch(() => {})
+                            writableStreamClosed?.catch(() => {}),
                         ].filter(Boolean));
-                    } catch (e) {
-                        // Streams might already be closed
-                        console.log('Stream close error:', e.message);
-                    }
+                    } catch (e) {}
                 }
-
-                // Close port
                 if (port) {
                     await port.close();
                     port = null;
                 }
-
-                // Reset variables
                 readableStreamClosed = null;
                 writableStreamClosed = null;
-
                 updateConnectionStatus(false);
                 log('Serial connection closed');
             } catch (error) {
-                log(`Error disconnecting: ${error.message}`, 'error');
-                // Force reset even on error
-                reader = null;
-                writer = null;
-                port = null;
-                readableStreamClosed = null;
-                writableStreamClosed = null;
+                log(`Error disconnecting: ${error.message}`);
+                reader = writer = port = readableStreamClosed = writableStreamClosed = null;
                 updateConnectionStatus(false);
             }
         }
 
         async function sendCommand(command) {
-            if (!writer) {
-                log('Not connected', 'error');
-                return;
-            }
+            if (!writer) { log('Not connected'); return; }
             try {
                 await writer.write(command + '\n');
-                log(`> ${command}`, 'command');
+                log(`> ${command}`);
             } catch (error) {
-                log(`Send error: ${error.message}`, 'error');
+                log(`Send error: ${error.message}`);
             }
         }
 
         connectBtn.addEventListener('click', connectSerial);
         disconnectBtn.addEventListener('click', disconnectSerial);
-        clearBtn.addEventListener('click', () => {
-            consoleDiv.innerHTML = '';
-        });
-
+        clearBtn.addEventListener('click', () => { consoleDiv.innerHTML = ''; });
         sendBtn.addEventListener('click', () => {
             const command = commandInput.value.trim();
-            if (command) {
-                sendCommand(command);
-                commandInput.value = '';
-            }
+            if (command) { sendCommand(command); commandInput.value = ''; }
+        });
+        commandInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') sendBtn.click();
         });
 
-        commandInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendBtn.click();
-            }
-        });
-
-        // Check Web Serial API support
         if (!('serial' in navigator)) {
-            log('Web Serial API not supported. Please use Chrome, Edge, or Opera.', 'error');
+            log('Web Serial API not supported. Please use Chrome, Edge, or Opera.');
             connectBtn.disabled = true;
         }
 
