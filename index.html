@@ -364,21 +364,22 @@
         function generateManifest(asset, version) {
             const baseUrl = getBaseUrl();
             const chipFamily = CHIP_FAMILY_MAP[asset.chip];
+            const appBin = baseUrl + `firmware/${asset.chipKey}-${asset.ruby}.bin`;
             let parts;
             let newInstallPromptErase = false;
 
             if (asset.chip === 'esp32' && !asset.variant) {
-                // Full flash: local support files + remote app binary
+                // Full flash: local support files + app binary
                 parts = [
                     { path: baseUrl + 'firmware/bootloader.bin',       offset: 4096 },
                     { path: baseUrl + 'firmware/partition-table.bin',   offset: 32768 },
-                    { path: asset.url,                                  offset: 65536 },
+                    { path: appBin,                                     offset: 65536 },
                     { path: baseUrl + 'firmware/storage.bin',           offset: 2162688 },
                 ];
                 newInstallPromptErase = true;
             } else {
                 // App binary only (other chip families lack local support files)
-                parts = [{ path: asset.url, offset: 65536 }];
+                parts = [{ path: appBin, offset: 65536 }];
             }
 
             const manifest = {
