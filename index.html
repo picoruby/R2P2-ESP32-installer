@@ -7,7 +7,6 @@
     <script type="module">
         import './js/esp-web-tools/install-button.js';
     </script>
-    <script src="./js/ansi_up/ansi_up.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -148,38 +147,6 @@
             margin: 20px 0;
         }
 
-        .console-section {
-            margin-top: 30px;
-            border-top: 2px solid #eee;
-            padding-top: 30px;
-        }
-
-        .console-section h2 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 20px;
-        }
-
-        #console {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            padding: 15px;
-            border-radius: 4px;
-            height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin-bottom: 15px;
-        }
-
-        .console-controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
         button {
             background: #CC342D;
             color: white;
@@ -198,39 +165,6 @@
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
-        }
-
-        .command-input {
-            display: flex;
-            gap: 10px;
-        }
-
-        #commandInput {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
-        }
-
-        .status {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-
-        .status.connected {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
         }
 
         .footer {
@@ -286,26 +220,6 @@
             <esp-web-install-button id="installButton">
                 <button slot="activate">Connect and Flash</button>
             </esp-web-install-button>
-        </div>
-
-        <div class="console-section">
-            <h2>
-                Simple Serial Console
-                <span id="connectionStatus" class="status disconnected">Disconnected</span>
-            </h2>
-
-            <div class="console-controls">
-                <button id="connectBtn">Connect to Serial</button>
-                <button id="disconnectBtn" disabled>Disconnect</button>
-                <button id="clearBtn">Clear Console</button>
-            </div>
-
-            <div id="console"></div>
-
-            <div class="command-input">
-                <input type="text" id="commandInput" placeholder="Enter command..." disabled>
-                <button id="sendBtn" disabled>Send</button>
-            </div>
         </div>
 
         <div class="footer">
@@ -448,154 +362,6 @@
         }
 
         fetchReleaseInfo();
-
-        // ---- Serial console ----
-
-        let port;
-        let reader;
-        let writer;
-        let readableStreamClosed;
-        let writableStreamClosed;
-        let isConnected = false;
-        let ansi_up;
-
-        const consoleDiv      = document.getElementById('console');
-        const connectBtn      = document.getElementById('connectBtn');
-        const disconnectBtn   = document.getElementById('disconnectBtn');
-        const clearBtn        = document.getElementById('clearBtn');
-        const commandInput    = document.getElementById('commandInput');
-        const sendBtn         = document.getElementById('sendBtn');
-        const connectionStatus = document.getElementById('connectionStatus');
-
-        if (typeof AnsiUp !== 'undefined') {
-            ansi_up = new AnsiUp();
-            ansi_up.use_classes = false;
-        }
-
-        function log(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            const line = `[${timestamp}] ${message}\n`;
-            if (ansi_up) {
-                consoleDiv.innerHTML += ansi_up.ansi_to_html(line);
-            } else {
-                consoleDiv.textContent += line;
-            }
-            consoleDiv.scrollTop = consoleDiv.scrollHeight;
-        }
-
-        function updateConnectionStatus(connected) {
-            isConnected = connected;
-            connectionStatus.textContent = connected ? 'Connected' : 'Disconnected';
-            connectionStatus.className   = 'status ' + (connected ? 'connected' : 'disconnected');
-            connectBtn.disabled    = connected;
-            disconnectBtn.disabled = !connected;
-            commandInput.disabled  = !connected;
-            sendBtn.disabled       = !connected;
-        }
-
-        async function connectSerial() {
-            try {
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 115200 });
-
-                const decoder = new TextDecoderStream();
-                readableStreamClosed = port.readable.pipeTo(decoder.writable);
-                reader = decoder.readable.getReader();
-
-                const encoder = new TextEncoderStream();
-                writableStreamClosed = encoder.readable.pipeTo(port.writable);
-                writer = encoder.writable.getWriter();
-
-                updateConnectionStatus(true);
-                log('Serial connection established');
-                readLoop();
-
-                await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-                await new Promise(resolve => setTimeout(resolve, 200));
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                await new Promise(resolve => setTimeout(resolve, 200));
-            } catch (error) {
-                log(`Error connecting: ${error.message}`);
-            }
-        }
-
-        async function readLoop() {
-            try {
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (ansi_up) {
-                        consoleDiv.innerHTML += ansi_up.ansi_to_html(value);
-                    } else {
-                        consoleDiv.textContent += value;
-                    }
-                    consoleDiv.scrollTop = consoleDiv.scrollHeight;
-                }
-            } catch (error) {
-                log(`Read error: ${error.message}`);
-            }
-        }
-
-        async function disconnectSerial() {
-            try {
-                if (reader) {
-                    await reader.cancel();
-                    reader = null;
-                }
-                if (writer) {
-                    try { await writer.close(); } catch (e) {}
-                    writer = null;
-                }
-                if (readableStreamClosed || writableStreamClosed) {
-                    try {
-                        await Promise.all([
-                            readableStreamClosed?.catch(() => {}),
-                            writableStreamClosed?.catch(() => {}),
-                        ].filter(Boolean));
-                    } catch (e) {}
-                }
-                if (port) {
-                    await port.close();
-                    port = null;
-                }
-                readableStreamClosed = null;
-                writableStreamClosed = null;
-                updateConnectionStatus(false);
-                log('Serial connection closed');
-            } catch (error) {
-                log(`Error disconnecting: ${error.message}`);
-                reader = writer = port = readableStreamClosed = writableStreamClosed = null;
-                updateConnectionStatus(false);
-            }
-        }
-
-        async function sendCommand(command) {
-            if (!writer) { log('Not connected'); return; }
-            try {
-                await writer.write(command + '\n');
-                log(`> ${command}`);
-            } catch (error) {
-                log(`Send error: ${error.message}`);
-            }
-        }
-
-        connectBtn.addEventListener('click', connectSerial);
-        disconnectBtn.addEventListener('click', disconnectSerial);
-        clearBtn.addEventListener('click', () => { consoleDiv.innerHTML = ''; });
-        sendBtn.addEventListener('click', () => {
-            const command = commandInput.value.trim();
-            if (command) { sendCommand(command); commandInput.value = ''; }
-        });
-        commandInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') sendBtn.click();
-        });
-
-        if (!('serial' in navigator)) {
-            log('Web Serial API not supported. Please use Chrome, Edge, or Opera.');
-            connectBtn.disabled = true;
-        }
-
-        log('Web Installer ready. Connect your ESP32 device.');
     </script>
 </body>
 </html>
