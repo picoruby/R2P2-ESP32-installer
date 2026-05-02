@@ -362,6 +362,93 @@
         }
 
         fetchReleaseInfo();
+
+        // ---- Intercept installation completion ----
+
+        // Watch for ewt-install-dialog being added to document.body
+        new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeName === 'EWT-INSTALL-DIALOG') {
+                        setupInstallDialogInterception(node);
+                    }
+                }
+            }
+        }).observe(document.body, { childList: true });
+
+        function setupInstallDialogInterception(dialog) {
+            function tryInjectCompletionUI() {
+                if (!dialog.shadowRoot) return;
+
+                // "Installation complete!" is rendered as text content in ewt-page-message
+                const shadowText = dialog.shadowRoot.textContent || '';
+                if (!shadowText.includes('Installation complete!')) return;
+
+                // Find the actions div (already injected = skip)
+                const actionsDiv = dialog.shadowRoot.querySelector('div[slot="actions"]');
+                if (!actionsDiv || actionsDiv.querySelector('.r2p2-completion')) return;
+
+                // Replace "Next" button with our completion content
+                actionsDiv.innerHTML = '';
+
+                const container = document.createElement('div');
+                container.className = 'r2p2-completion';
+                container.style.cssText = [
+                    'display:flex',
+                    'flex-direction:column',
+                    'align-items:center',
+                    'gap:14px',
+                    'padding:4px 16px 4px',
+                ].join(';');
+
+                const link = document.createElement('a');
+                link.href = 'https://picoruby.org/terminal';
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = 'Open PicoRuby Terminal →';
+                link.style.cssText = [
+                    'color:#CC342D',
+                    'font-size:15px',
+                    'font-weight:500',
+                    'text-decoration:none',
+                ].join(';');
+                link.addEventListener('mouseover',  () => { link.style.textDecoration = 'underline'; });
+                link.addEventListener('mouseout',   () => { link.style.textDecoration = 'none'; });
+
+                const okBtn = document.createElement('button');
+                okBtn.textContent = 'OK';
+                okBtn.style.cssText = [
+                    'background:#CC342D',
+                    'color:#fff',
+                    'border:none',
+                    'padding:10px 32px',
+                    'border-radius:4px',
+                    'cursor:pointer',
+                    'font-size:14px',
+                    'font-family:inherit',
+                ].join(';');
+                okBtn.addEventListener('mouseover', () => { okBtn.style.background = '#A52A2A'; });
+                okBtn.addEventListener('mouseout',  () => { okBtn.style.background = '#CC342D'; });
+                okBtn.addEventListener('click', () => {
+                    // Close the ew-dialog inside the shadow DOM; ewt-install-dialog
+                    // will handle cleanup (port close, self-removal) via its own listener.
+                    const ewDialog = dialog.shadowRoot.querySelector('ew-dialog');
+                    if (ewDialog) ewDialog.close();
+                });
+
+                container.appendChild(link);
+                container.appendChild(okBtn);
+                actionsDiv.appendChild(container);
+            }
+
+            // Wait for the shadow root to be ready, then observe mutations
+            const waitId = setInterval(() => {
+                if (!dialog.shadowRoot) return;
+                clearInterval(waitId);
+                new MutationObserver(tryInjectCompletionUI)
+                    .observe(dialog.shadowRoot, { childList: true, subtree: true });
+            }, 50);
+        }
     </script>
 </body>
 </html>
