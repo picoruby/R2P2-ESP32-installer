@@ -380,13 +380,19 @@
             function tryInjectCompletionUI() {
                 if (!dialog.shadowRoot) return;
 
-                // "Installation complete!" is rendered as text content in ewt-page-message
-                const shadowText = dialog.shadowRoot.textContent || '';
-                if (!shadowText.includes('Installation complete!')) return;
+                // label="Installation complete!" is set as a DOM attribute by Lit
+                // (no leading dot in the template = attribute binding, not property binding)
+                const completeMsg = dialog.shadowRoot.querySelector(
+                    'ewt-page-message[label="Installation complete!"]'
+                );
+                if (!completeMsg) return;
 
-                // Find the actions div (already injected = skip)
+                // Find the actions div — may not exist yet if Lit hasn't rendered it
                 const actionsDiv = dialog.shadowRoot.querySelector('div[slot="actions"]');
-                if (!actionsDiv || actionsDiv.querySelector('.r2p2-completion')) return;
+                if (!actionsDiv) return;
+
+                // Already injected (guard against Lit re-renders)
+                if (actionsDiv.querySelector('.r2p2-completion')) return;
 
                 // Replace "Next" button with our completion content
                 actionsDiv.innerHTML = '';
