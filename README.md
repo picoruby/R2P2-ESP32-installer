@@ -11,28 +11,34 @@ https://picoruby.org/R2P2-ESP32-installer/
 3. Select your board and Ruby variant from the dropdowns
 4. Click **Connect and Flash** and select the serial port
 5. Wait for flashing to complete
-6. Click **Connect to Serial** to open the serial console
+6. After flashing completes, click **Open PicoRuby Terminal** or **OK**
 
 ## Requirements
 
 - Browser with Web Serial API support (Chrome, Edge, Opera)
 - USB-connected ESP32 device
 
-## Supported boards
+## Supported combinations
 
-| Board | chipFamily |
-|-------|------------|
-| ESP32 | ESP32 |
-| ESP32-C3 | ESP32-C3 |
-| ESP32-S3 | ESP32-S3 |
-| ESP32-S3 (USB Console) | ESP32-S3 |
+Available variants match the [R2P2-ESP32 release workflow](https://github.com/picoruby/R2P2-ESP32/blob/master/.github/workflows/release.yml).
 
-## Firmware variants
+| Board | FemtoRuby | PicoRuby |
+|-------|:---------:|:--------:|
+| ESP32 | ✓ | — |
+| ESP32-C3 | ✓ | — |
+| ESP32-S3 | ✓ | ✓ |
+| ESP32-S3 (USB Console) | ✓ | ✓ |
 
-| Variant | Description |
-|---------|-------------|
-| FemtoRuby | Lightweight Ruby runtime |
-| PicoRuby | Full PicoRuby runtime |
+The Ruby variant dropdown is filtered automatically based on the selected board.
+
+## Local development
+
+```sh
+python3 -m http.server 8080
+```
+
+Open `http://localhost:8080` in Chrome, Edge, or Opera.
+Web Serial API requires a secure context; `localhost` qualifies without HTTPS.
 
 ## Updating firmware
 
@@ -47,12 +53,10 @@ firmware/
     bootloader.bin
     partition-table.bin
     femtoruby.bin
-    picoruby.bin
   esp32c3/
     bootloader.bin
     partition-table.bin
     femtoruby.bin
-    picoruby.bin
   esp32s3/
     bootloader.bin
     partition-table.bin

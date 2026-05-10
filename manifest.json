@@ -17,7 +17,7 @@
           "offset": 32768
         },
         {
-          "path": "firmware/esp32/picoruby.bin",
+          "path": "firmware/esp32/femtoruby.bin",
           "offset": 65536
         },
         {
@@ -39,7 +39,7 @@
           "offset": 32768
         },
         {
-          "path": "firmware/esp32c3/picoruby.bin",
+          "path": "firmware/esp32c3/femtoruby.bin",
           "offset": 65536
         },
         {
