@@ -45,9 +45,7 @@ jobs:
           dl() { curl -fSL -o "$2" "$1"; }
 
           dl "${BASE}/R2P2-ESP32-esp32-femtoruby.bin"               firmware/esp32/femtoruby.bin
-          dl "${BASE}/R2P2-ESP32-esp32-picoruby.bin"                firmware/esp32/picoruby.bin
           dl "${BASE}/R2P2-ESP32-esp32c3-femtoruby.bin"             firmware/esp32c3/femtoruby.bin
-          dl "${BASE}/R2P2-ESP32-esp32c3-picoruby.bin"              firmware/esp32c3/picoruby.bin
           dl "${BASE}/R2P2-ESP32-esp32s3-femtoruby.bin"             firmware/esp32s3/femtoruby.bin
           dl "${BASE}/R2P2-ESP32-esp32s3-picoruby.bin"              firmware/esp32s3/picoruby.bin
           dl "${BASE}/R2P2-ESP32-esp32s3-usb_console-femtoruby.bin" firmware/esp32s3-usb_console/femtoruby.bin

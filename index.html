@@ -234,10 +234,9 @@
         const GITHUB_RELEASES_API = 'https://api.github.com/repos/picoruby/R2P2-ESP32/releases/latest';
 
         const CHIP_FAMILY_MAP = {
-            esp32:              'ESP32',
-            esp32c3:            'ESP32-C3',
-            esp32s3:            'ESP32-S3',
-            esp32s3_usb_console: 'ESP32-S3',
+            esp32:   'ESP32',
+            esp32c3: 'ESP32-C3',
+            esp32s3: 'ESP32-S3',
         };
 
         // ESP32 (original) uses bootloader offset 0x1000; all other chips use 0x0000
@@ -340,15 +339,22 @@
                     `<option value="${key}">${CHIP_LABEL_MAP[key] || key}</option>`
                 ).join('');
 
-                // Build ruby options (unique rubies)
-                const rubies = [...new Set(parsedAssets.map(a => a.ruby))];
                 const rubySelect = document.getElementById('rubySelect');
-                rubySelect.innerHTML = rubies.map(r =>
-                    `<option value="${r}">${RUBY_LABEL_MAP[r] || r}</option>`
-                ).join('');
 
-                chipSelect.addEventListener('change', updateManifest);
+                function updateRubyOptions(chipKey) {
+                    const rubies = [...new Set(parsedAssets.filter(a => a.chipKey === chipKey).map(a => a.ruby))];
+                    rubySelect.innerHTML = rubies.map(r =>
+                        `<option value="${r}">${RUBY_LABEL_MAP[r] || r}</option>`
+                    ).join('');
+                }
+
+                chipSelect.addEventListener('change', () => {
+                    updateRubyOptions(chipSelect.value);
+                    updateManifest();
+                });
                 rubySelect.addEventListener('change', updateManifest);
+
+                updateRubyOptions(chipKeys[0]);
 
                 statusEl.textContent = `Latest release: ${releaseInfo.tag_name}`;
                 statusEl.className   = 'release-status loaded';
