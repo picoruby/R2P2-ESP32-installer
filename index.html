@@ -275,7 +275,8 @@
                     const variant = variantParts.length > 0 ? variantParts.join('_') : null;
                     const chipKey = variant ? `${chip}_${variant}` : chip;
                     return { chip, variant, chipKey, ruby, url: a.browser_download_url };
-                });
+                })
+                .filter(a => a.chipKey in CHIP_LABEL_MAP && a.ruby in RUBY_LABEL_MAP);
         }
 
         function getBaseUrl() {
