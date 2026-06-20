@@ -414,19 +414,14 @@
                     'padding:4px 16px 4px',
                 ].join(';');
 
-                const link = document.createElement('a');
-                link.href = 'https://picoruby.org/terminal';
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.textContent = 'Open PicoRuby Terminal →';
-                link.style.cssText = [
-                    'color:#CC342D',
+                const resetMsg = document.createElement('p');
+                resetMsg.textContent = 'Please reset your device to start the firmware.';
+                resetMsg.style.cssText = [
                     'font-size:15px',
                     'font-weight:500',
-                    'text-decoration:none',
+                    'color:#333',
+                    'text-align:center',
                 ].join(';');
-                link.addEventListener('mouseover',  () => { link.style.textDecoration = 'underline'; });
-                link.addEventListener('mouseout',   () => { link.style.textDecoration = 'none'; });
 
                 const okBtn = document.createElement('button');
                 okBtn.textContent = 'OK';
@@ -443,13 +438,38 @@
                 okBtn.addEventListener('mouseover', () => { okBtn.style.background = '#A52A2A'; });
                 okBtn.addEventListener('mouseout',  () => { okBtn.style.background = '#CC342D'; });
                 okBtn.addEventListener('click', () => {
-                    // Close the ew-dialog inside the shadow DOM; ewt-install-dialog
-                    // will handle cleanup (port close, self-removal) via its own listener.
-                    const ewDialog = dialog.shadowRoot.querySelector('ew-dialog');
-                    if (ewDialog) ewDialog.close();
+                    // Switch to final completion view
+                    container.innerHTML = '';
+
+                    const link = document.createElement('a');
+                    link.href = 'https://picoruby.org/terminal';
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = 'Open PicoRuby Terminal →';
+                    link.style.cssText = [
+                        'color:#CC342D',
+                        'font-size:15px',
+                        'font-weight:500',
+                        'text-decoration:none',
+                    ].join(';');
+                    link.addEventListener('mouseover',  () => { link.style.textDecoration = 'underline'; });
+                    link.addEventListener('mouseout',   () => { link.style.textDecoration = 'none'; });
+
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = 'Close';
+                    closeBtn.style.cssText = okBtn.style.cssText;
+                    closeBtn.addEventListener('mouseover', () => { closeBtn.style.background = '#A52A2A'; });
+                    closeBtn.addEventListener('mouseout',  () => { closeBtn.style.background = '#CC342D'; });
+                    closeBtn.addEventListener('click', () => {
+                        const ewDialog = dialog.shadowRoot.querySelector('ew-dialog');
+                        if (ewDialog) ewDialog.close();
+                    });
+
+                    container.appendChild(link);
+                    container.appendChild(closeBtn);
                 });
 
-                container.appendChild(link);
+                container.appendChild(resetMsg);
                 container.appendChild(okBtn);
                 actionsDiv.appendChild(container);
             }
